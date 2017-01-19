@@ -1,0 +1,309 @@
+Use the readr package to read the daily_SPEC_2014.csv.bz2 data file in to R. This file contains daily levels of fine particulate matter (PM2.5) chemical constituents across the United States. The data are measured at a network of federal, state, and local monitors and assembled by the EPA.
+In this dataset, the "Sample.Value" column provides the level of the indicated chemical constituent and the "Parameter.Name" column provides the name of the chemical constituent. The combination of a "State.Code", a "County.Code", and a "Site.Num", uniquely identifies a monitoring site (the location of which is provided by the "Latitude" and "Longitude" columns).
+For all of the questions below, you can ignore the missing values in the dataset, so when taking averages, just remove the missing values before taking the average (i.e. you can use na.rm = TRUE in the mean() function)
+1.	What is average Sample.Value for “Bromine PM2.5 LC” in the state of Wisconsin in this dataset?
+ 0.003960
+library(readr)
+spec <- read_csv("data/SPEC_2014.csv.bz2", progress = FALSE)
+
+filter(spec, Parameter.Name == "Bromine PM2.5 LC" & State.Name == "Wisconsin") %>%
+        summarize(avg = mean(Sample.Value))
+# A tibble: 1 × 1
+          avg
+        <dbl>
+1 0.003960482
+
+2. 
+Calculate the average of each chemical constituent across all states, monitoring sites and all time points.
+Which constituent Parameter.Name has the highest average level?
+OC CSN Unadjusted PM2.5 LC TOT
+
+group_by(spec, Parameter.Name) %>% 
+        summarize(avg = mean(Sample.Value)) %>%
+        arrange(desc(avg)) 
+# A tibble: 86 × 2
+                       Parameter.Name        avg
+                                <chr>      <dbl>
+1      OC CSN Unadjusted PM2.5 LC TOT 67.7838260
+2                 EC CSN PM2.5 LC TOT  8.2065824
+3           Total Carbon PM2.5 LC TOT  3.1132523
+4  OC CSN_Rev Unadjusted PM2.5 LC TOT  2.3100559
+5  OC CSN_Rev Unadjusted PM2.5 LC TOR  2.1695842
+6                    Sulfate PM2.5 LC  1.1651597
+7                     OC PM2.5 LC TOR  0.8511244
+8              Total Nitrate PM2.5 LC  0.8224759
+9     EC1 CSN_Rev Unadjusted PM2.5 LC  0.8091627
+10              Ammonium Ion PM2.5 LC  0.7000858
+
+3. (?)
+Which monitoring site has the highest average level of “Sulfate PM2.5 LC” across all time?
+Indicate the state code, county code, and site number.
+ State 39 County 081 Site 0017
+filter(spec, Parameter.Name == "Sulfate PM2.5 LC") %>%
+        group_by(State.Code, County.Code, Site.Num) %>%
+        summarize(avg = mean(Sample.Value)) %>%
+        arrange(desc(avg))
+Source: local data frame [358 x 4]
+Groups: State.Code, County.Code [313]
+
+   State.Code County.Code Site.Num      avg
+        <chr>       <chr>    <chr>    <dbl>
+1          39         081     0017 3.182189
+2          42         003     0064 3.055483
+3          54         039     1005 2.938800
+4          18         019     0006 2.738700
+5          39         153     0023 2.706449
+6          39         035     0060 2.640185
+7          39         087     0012 2.638311
+8          54         051     1002 2.619043
+9          21         111     0067 2.549750
+10         18         037     2001 2.516367
+
+4. 
+What is the absolute difference in the average levels of “EC PM2.5 LC TOR” between the states California and Arizona, across all time and all monitoring sites?
+ 0.018567
+
+filter(spec, State.Name %in% c("California", "Arizona") 
+       & Parameter.Name == "EC PM2.5 LC TOR") %>%
+       group_by(State.Name) %>%
+        summarize(avg = mean(Sample.Value)) %>%
+        spread(State.Name, avg) %>%
+        mutate(diff = Arizona - California)
+# A tibble: 1 × 3
+    Arizona California        diff
+      <dbl>      <dbl>       <dbl>
+1 0.1791704  0.1977374 -0.01856696
+
+5. 
+What is the median level of “OC PM2.5 LC TOR” in the western United States, across all time? Define western as any monitoring location that has a Longitude LESS THAN -100.
+ 0.4300
+
+filter(spec, Parameter.Name %in% c("OC PM2.5 LC TOR", "EC PM2.5 LC TOR")) %>%
+       mutate(region = ifelse(Longitude < -100, "west", "east")) %>%
+        group_by(Parameter.Name, region) %>%
+        summarize(median = median(Sample.Value)) %>%
+        spread(region, median)
+
+Source: local data frame [2 x 3]
+Groups: Parameter.Name [2]
+
+   Parameter.Name  east  west
+*           <chr> <dbl> <dbl>
+1 EC PM2.5 LC TOR  0.17  0.06
+2 OC PM2.5 LC TOR  0.88  0.43
+
+6. 
+Use the readxl package to read the file aqs_sites.xlsx into R (you may need to install the package first). This file contains metadata about each of the monitoring sites in the EPA’s monitoring system. In particular, the "Land Use" and "Location Setting" variables contain information about what kinds of areas the monitors are located in (i.e. “residential” vs. “forest”).
+How many monitoring sites are labelled as both RESIDENTIAL for "Land Use" and SUBURBAN for "Location Setting"?
+ 3527
+library(readxl)
+sites <- read_excel("data/aqs_sites.xlsx")
+names(sites) <-  gsub(" +", ".", names(sites))
+names(sites)
+[1] "State.Code"            "County.Code"          
+ [3] "Site.Number"           "Latitude"             
+ [5] "Longitude"             "Datum"                
+ [7] "Elevation"             "Land.Use"             
+ [9] "Location.Setting"      "Site.Established.Date"
+[11] "Site.Closed.Date"      "Met.Site.State.Code"  
+[13] "Met.Site.County.Code"  "Met.Site.Site.Number" 
+[15] "Met.Site.Type"         "Met.Site.Distance"    
+[17] "Met.Site.Direction"    "GMT.Offset"           
+[19] "Owning.Agency"         "Local.Site.Name"      
+[21] "Address"               "Zip.Code"             
+[23] "State.Name"            "County.Name"          
+[25] "City.Name"             "CBSA.Name"            
+[27] "Tribe.Name"            "Extraction.Date"  
+
+filter(sites, Land.Use == "RESIDENTIAL" & Location.Setting == "SUBURBAN") %>%
+        summarize(n = n())
+# A tibble: 1 × 1
+      n
+  <int>
+1  3527
+
+7. 
+What is the median level of “EC PM2.5 LC TOR” amongst monitoring sites that are labelled as both “RESIDENTIAL” and “SUBURBAN” in the eastern U.S., where eastern is defined as Longitude greater than or equal to -100?
+ 0.6100
+
+sites <- rename(sites, Site.Num = Site.Number) %>%
+        select(State.Code, County.Code, Site.Num, Longitude, Land.Use, 
+               Location.Setting)
+spec <- mutate(spec, State.Code = as.numeric(State.Code),
+               County.Code = as.numeric(County.Code),
+               Site.Num = as.numeric(Site.Num)) %>%
+        select(State.Code, County.Code, Site.Num, Parameter.Name, Sample.Value)
+m <- left_join(spec, sites, by = c("State.Code", "County.Code", "Site.Num"))
+str(m)
+
+Classes 'tbl_df', 'tbl' and 'data.frame':   1519790 obs. of  8 variables:
+ $ State.Code      : num  1 1 1 1 1 1 1 1 1 1 ...
+ $ County.Code     : num  73 73 73 73 73 73 73 73 73 73 ...
+ $ Site.Num        : num  23 23 23 23 23 23 23 23 23 23 ...
+ $ Parameter.Name  : chr  "Antimony PM2.5 LC" "Antimony PM2.5 LC" "Antimony PM2.5 LC" "Antimony PM2.5 LC" ...
+ $ Sample.Value    : num  0 0 0 0.012 0.008 0 0.006 0 0 0 ...
+ $ Longitude       : num  -86.8 -86.8 -86.8 -86.8 -86.8 ...
+ $ Land.Use        : chr  "COMMERCIAL" "COMMERCIAL" "COMMERCIAL" "COMMERCIAL" ...
+ $ Location.Setting: chr  "URBAN AND CENTER CITY" "URBAN AND CENTER CITY" "URBAN AND CENTER CITY" "URBAN AND CENTER CITY" ...
+
+filter(m, Parameter.Name %in% c("OC PM2.5 LC TOR", "EC PM2.5 LC TOR")
+       & Land.Use == "RESIDENTIAL" & Location.Setting == "SUBURBAN"
+       & Longitude >= -100) %>%
+        group_by(Parameter.Name) %>%
+        summarize(median = median(Sample.Value))
+
+# A tibble: 2 × 2
+   Parameter.Name median
+            <chr>  <dbl>
+1 EC PM2.5 LC TOR   0.61
+2 OC PM2.5 LC TOR   1.51
+
+8. 
+Amongst monitoring sites that are labeled as COMMERCIAL for "Land Use", which month of the year has the highest average levels of "Sulfate PM2.5 LC"?
+ February
+> sufate_month<-select(sulfate,State.Code,County.Code,Site.Num,Parameter.Name,Arithmetic.Mean,Date.Local)
+
+> library(lubridate)
+> mutate(sufate_month,m=months(Date.Local))
+
+
+> sufate_month<-mutate(sufate_month,m=months(Date.Local))
+> library(tidyr)
+
+> sufate_month2 <- left_join(sufate_month, sites, by = c("State.Code", "County.Code", "Site.Num"))
+> sufate_filtered<-sufate_month2%>%
++ filter(Land.Use=="COMMERCIAL")
+> sufate_filtered%>%
++ group_by(m)%>%
++ summarize(Mean=mean(Arithmetic.Mean,na.rm=TRUE))
+# A tibble: 12 × 2
+        m     Mean
+    <chr>    <dbl>
+1    八月 1.761226
+2    二月 2.021325
+3    九月 1.645010
+4    六月 1.750571
+5    七月 1.777605
+6    三月 1.805260
+7  十二月 1.537649
+8  十一月 1.295837
+9    十月 1.313770
+10   四月 1.567614
+11   五月 1.558096
+12   一月 1.316738
+
+9. 
+Take a look at the data for the monitoring site identified by State Code 6, County Code 65, and Site Number 8001 (this monitor is in California). At this monitor, for how many days is the sum of "Sulfate PM2.5 LC" and "Total Nitrate PM2.5 LC" greater than 10?
+For each of the chemical constituents, there will be some dates that have multiple Sample.Value's at this monitoring site. When there are multiple values on a given date, take the average of the constituent values for that date.
+ 11
+> names(specs)<-gsub(" +", ".", names(specs))
+> specs <- mutate(specs, State.Code = as.numeric(State.Code),
++ County.Code = as.numeric(County.Code),
++ Site.Num = as.numeric(Site.Num))
+> specs_filtered<-filter(specs,State.Code==6&County.Code==65&Site.Num==8001)
+> specs_filtered<-filter(specs_filtered,Parameter.Name%in%c("Sulfate PM2.5 LC","Total Nitrate PM2.5 LC"))
+> filter(specs_filtered,Arithmetic.Mean>=10)%>%
++ summarize(n=n())
+# A tibble: 1 × 1
+      n
+  <int>
+1    15
+> see<-filter(specs_filtered,Arithmetic.Mean>=10)
+> see<-see%>%
++ group_by(Date.Local)
+> see%>%
++ summarize(n=n())
+# A tibble: 9 × 2
+  Date.Local     n
+      <date> <int>
+1 2014-01-11     2
+2 2014-01-29     3
+3 2014-02-10     2
+4 2014-02-19     1
+5 2014-02-25     1
+6 2014-03-06     2
+7 2014-03-24     2
+8 2014-10-11     1
+9 2014-11-10     1
+> see%>%
++ summarize(mean=mean(Arithmetic.Mean))
+# A tibble: 9 × 2
+  Date.Local     mean
+      <date>    <dbl>
+1 2014-01-11 15.80000
+2 2014-01-29 15.49333
+3 2014-02-10 10.80000
+4 2014-02-19 15.00000
+5 2014-02-25 14.20000
+6 2014-03-06 11.00000
+7 2014-03-24 12.50000
+8 2014-10-11 12.30000
+9 2014-11-10 18.30000
+> specs_filtered<-specs_filtered%>%
++ group_by(Date.Local)
+> see<-specs_filtered%>%
++ summarize(ave=mean(Arithmetic.Mean))
+> see<-filter(see,ave>=10)
+One observation?
+
+10. 
+Which monitoring site in the dataset has the highest correlation between "Sulfate PM2.5 LC" and "Total Nitrate PM2.5 LC" across all dates? Identify the monitoring site by it's State, County, and Site Number code.
+For each of the chemical constituents, there will be some dates that have multiple Sample.Value's at a monitoring site. When there are multiple values on a given date, take the average of the constituent values for that date.
+Correlations between to variables can be computed with the cor() function.
+ State 2 County 90 Site 35
+
+> sulfate<-sulfate%>%
++ select(State.Code,County.Code,Site.Num,Parameter.Name,Arithmetic.Mean,Date.Local)
+>  Nitrate<-Nitrate%>%
++     select(State.Code,County.Code,Site.Num,Parameter.Name,Arithmetic.Mean,Date.Local)%>%
++      rename(A.M2=Arithmetic.Mean)
+> relationship<-left_join(sulfate,Nitrate,by = c("State.Code", "County.Code", "Site.Num","Date.Local"))
+> corr<-corr%>%
++ group_by(State.Code,County.Code,Site.Num,Date.Local)%>%
++ summarize(ave1=mean(Arithmetic.Mean),ave2=mean(A.M2))
+Source: local data frame [34,056 x 6]
+Groups: State.Code, County.Code, Site.Num [?]
+
+   State.Code County.Code Site.Num Date.Local    ave1    ave2
+        <dbl>       <dbl>    <dbl>     <date>   <dbl>   <dbl>
+1           1          73       23 2014-01-02 1.87700 0.96800
+2           1          73       23 2014-01-05 2.39010 0.48040
+3           1          73       23 2014-01-08 1.23035 1.31215
+4           1          73       23 2014-01-11 0.76595 0.12570
+5           1          73       23 2014-01-14 0.53880 0.46925
+6           1          73       23 2014-01-17 0.58510 0.31010
+7           1          73       23 2014-01-20 1.01885 0.48780
+8           1          73       23 2014-01-23 0.88840 1.80665
+9           1          73       23 2014-01-26 1.27575 0.75490
+10          1          73       23 2014-01-29 0.93750 2.16780
+> corr%>%
++ mutate(corr=cor(ave1,ave2))
+Source: local data frame [34,056 x 7]
+Groups: State.Code, County.Code, Site.Num [358]
+
+   State.Code County.Code Site.Num Date.Local    ave1    ave2      corr
+        <dbl>       <dbl>    <dbl>     <date>   <dbl>   <dbl>     <dbl>
+1           1          73       23 2014-01-02 1.87700 0.96800 0.2937687
+2           1          73       23 2014-01-05 2.39010 0.48040 0.2937687
+3           1          73       23 2014-01-08 1.23035 1.31215 0.2937687
+4           1          73       23 2014-01-11 0.76595 0.12570 0.2937687
+5           1          73       23 2014-01-14 0.53880 0.46925 0.2937687
+6           1          73       23 2014-01-17 0.58510 0.31010 0.2937687
+7           1          73       23 2014-01-20 1.01885 0.48780 0.2937687
+8           1          73       23 2014-01-23 0.88840 1.80665 0.2937687
+9           1          73       23 2014-01-26 1.27575 0.75490 0.2937687
+10          1          73       23 2014-01-29 0.93750 2.16780 0.2937687
+# ... with 34,046 more rows
+> corr%>%
++ ungroup(State.Code,County.Code,Site.Num,Date.Local)
+> corr%>%
++ arrange(desc(corr))%>%
++ head(5)
+# A tibble: 5 × 7
+  State.Code County.Code Site.Num Date.Local  ave1  ave2      corr
+       <dbl>       <dbl>    <dbl>     <date> <dbl> <dbl>     <dbl>
+1          2          90       35 2014-01-02 2.440 0.782 0.8978038
+2          2          90       35 2014-01-05 0.932 0.653 0.8978038
+3          2          90       35 2014-01-08 2.350 1.040 0.8978038
+4          2          90       35 2014-01-11 7.500 1.850 0.8978038
+5          2          90       35 2014-01-14 2.020 1.150 0.8978038
